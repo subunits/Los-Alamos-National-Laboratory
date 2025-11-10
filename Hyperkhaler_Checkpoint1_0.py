@@ -17,6 +17,9 @@ import torch
 import torch.nn as nn
 import os
 
+# --------------------------
+# Quaternion Utilities
+# --------------------------
 def normalize_quaternion(q):
     norm = torch.norm(q, dim=-1, keepdim=True) + 1e-8
     return q / norm
@@ -40,11 +43,23 @@ def slerp(q0, q1, t):
     s1 = torch.where(small, t, torch.sin(t * theta) / sin_theta)
     return normalize_quaternion(s0 * q0 + s1 * q1)
 
+# --------------------------
+# Hyperkähler Modules
+# --------------------------
 class HyperkählerAutoencoder(nn.Module):
     def __init__(self, input_dim=16, latent_dim=8):
         super().__init__()
-        self.encoder = nn.Sequential(nn.Linear(input_dim, 32), nn.ReLU(), nn.Linear(32, latent_dim*4))
-        self.decoder = nn.Sequential(nn.Linear(latent_dim*4, 32), nn.ReLU(), nn.Linear(32, input_dim))
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, 32),
+            nn.ReLU(),
+            nn.Linear(32, latent_dim*4)
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(latent_dim*4, 32),
+            nn.ReLU(),
+            nn.Linear(32, input_dim)
+        )
+
     def forward(self, x):
         q_latent = self.encoder(x).view(*x.shape[:-1], -1, 4)
         q_latent = normalize_quaternion(q_latent)
@@ -56,7 +71,12 @@ class HyperkählerTransformer(nn.Module):
     def __init__(self, latent_dim=8, n_heads=2):
         super().__init__()
         self.attn = nn.MultiheadAttention(embed_dim=latent_dim*4, num_heads=n_heads, batch_first=True)
-        self.ff = nn.Sequential(nn.Linear(latent_dim*4, latent_dim*4), nn.ReLU(), nn.Linear(latent_dim*4, latent_dim*4))
+        self.ff = nn.Sequential(
+            nn.Linear(latent_dim*4, latent_dim*4),
+            nn.ReLU(),
+            nn.Linear(latent_dim*4, latent_dim*4)
+        )
+
     def forward(self, q_latent):
         b, l, latent, _ = q_latent.shape
         flat = q_latent.view(b, l, -1)
@@ -70,11 +90,15 @@ class HyperkählerFusion(nn.Module):
         super().__init__()
         self.freqs = nn.Parameter(torch.linspace(0.1, 1.0, latent_dim).unsqueeze(0))
         self.phase = nn.Parameter(torch.zeros(latent_dim).unsqueeze(0))
+
     def forward(self, q_latent):
         t = torch.linspace(0, 1, q_latent.shape[1]).unsqueeze(0).unsqueeze(-1)
         sin_embed = torch.sin(t * self.freqs.unsqueeze(1) + self.phase.unsqueeze(1)).unsqueeze(-1)
         return normalize_quaternion(q_latent + sin_embed)
 
+# --------------------------
+# Headless Runner
+# --------------------------
 def run_headless(batch_size=4, seq_len=10, input_dim=16, latent_dim=8, output_dir='outputs'):
     os.makedirs(output_dir, exist_ok=True)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
