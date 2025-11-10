@@ -1,3 +1,17 @@
+"""
+Hyperkhaler Stack – Version 1.0
+Stable checkpoint for Hyperkähler Wave Function Collapse workflows.
+
+Features:
+- Quaternionic latent space operations
+- SLERP-based interpolation between latent quaternions
+- HyperkählerAutoencoder: latent encoding/decoding
+- HyperkählerTransformer: multihead attention over quaternions
+- HyperkählerFusion: sinusoidal latent fusion
+- Headless runner saving outputs for downstream analysis
+
+This file represents the minimal 1.0 baseline before experimental extensions.
+"""
 
 import torch
 import torch.nn as nn
